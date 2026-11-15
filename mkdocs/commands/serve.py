@@ -4,6 +4,7 @@ import logging
 import signal
 import shutil
 import tempfile
+import threading
 from os.path import isdir, isfile, join
 from typing import TYPE_CHECKING
 from urllib.parse import urlsplit
@@ -16,6 +17,29 @@ if TYPE_CHECKING:
     from mkdocs.config.defaults import MkDocsConfig
 
 log = logging.getLogger(__name__)
+
+
+def _register_sigterm_handler():
+    """Install a handler that turns SIGTERM into a clean shutdown.
+
+    Returns the previously registered handler so callers can restore it.
+    Only the main thread may call :func:`signal.signal`, so a caller that
+    runs ``serve()`` from a worker thread must be able to skip this.
+    """
+    if threading.current_thread() is not threading.main_thread():
+        return None
+
+    def _sigterm_handler(signum, frame):
+        raise KeyboardInterrupt()
+
+    return signal.signal(signal.SIGTERM, _sigterm_handler)
+
+
+def _restore_sigterm_handler(previous):
+    """Put back the handler that was registered before serve() ran."""
+    if previous is None:
+        return
+    signal.signal(signal.SIGTERM, previous)
 
 
 def serve(
@@ -99,17 +123,14 @@ def serve(
             for item in config.watch:
                 server.watch(item)
 
-        def _sigterm_handler(signum, frame):
-            raise KeyboardInterrupt()
-
-        signal.signal(signal.SIGTERM, _sigterm_handler)
+        previous_sigterm = _register_sigterm_handler()
 
         try:
             server.serve(open_in_browser=open_in_browser)
         except KeyboardInterrupt:
             log.info("Shutting down...")
         finally:
-            signal.signal(signal.SIGTERM, signal.SIG_DFL)
+            _restore_sigterm_handler(previous_sigterm)
             server.shutdown()
     finally:
         config.plugins.on_shutdown()
