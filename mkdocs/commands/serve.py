@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 import logging
-import signal
 import shutil
+import signal
 import tempfile
 import threading
 from os.path import isdir, isfile, join
@@ -20,7 +20,8 @@ log = logging.getLogger(__name__)
 
 
 def _register_sigterm_handler():
-    """Install a handler that turns SIGTERM into a clean shutdown.
+    """
+    Install a handler that turns SIGTERM into a clean shutdown.
 
     Returns the previously registered handler so callers can restore it.
     Only the main thread may call :func:`signal.signal`, so a caller that
@@ -30,7 +31,7 @@ def _register_sigterm_handler():
         return None
 
     def _sigterm_handler(signum, frame):
-        raise KeyboardInterrupt()
+        raise KeyboardInterrupt
 
     return signal.signal(signal.SIGTERM, _sigterm_handler)
 
